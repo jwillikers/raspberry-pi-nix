@@ -1,6 +1,7 @@
 { u-boot-src
 , rpi-linux-6_6_54-src
 , rpi-linux-6_10_12-src
+, rpi-linux-6_12_0-rc5-src
 , rpi-firmware-src
 , rpi-firmware-nonfree-src
 , rpi-bluez-firmware-src
@@ -12,6 +13,18 @@ let
     v6_6_54.src = rpi-linux-6_6_54-src;
     v6_10_12 = {
       src = rpi-linux-6_10_12-src;
+      patches = [
+        {
+          name = "remove-readme-target.patch";
+          patch = final.fetchpatch {
+            url = "https://github.com/raspberrypi/linux/commit/3c0fd51d184f1748b83d28e1113265425c19bcb5.patch";
+            hash = "sha256-v7uZOmPCUp2i7NGVgjqnQYe6dEBD+aATuP/oRs9jfuk=";
+          };
+        }
+      ];
+    };
+    v6_12_0-rc5 = {
+      src = rpi-linux-6_12_0-rc5-src;
       patches = [
         {
           name = "remove-readme-target.patch";
@@ -57,6 +70,14 @@ let
           # [2] https://github.com/raspberrypi/linux/blob/1.20230405/lib/kunit/Kconfig#L5-L14
           # [3] https://github.com/raspberrypi/linux/blob/bb63dc31e48948bc2649357758c7a152210109c4/drivers/gpu/drm/vc4/Kconfig#L38-L52
           KUNIT = no;
+
+          PREEMPT_RT = yes;
+          EXPERT = yes; # PREEMPT_RT depends on it (in kernel/Kconfig.preempt)
+          # Fix error: option not set correctly: PREEMPT_VOLUNTARY (wanted 'y', got 'n').
+          PREEMPT_VOLUNTARY = prev.lib.mkForce no; # PREEMPT_RT deselects it.
+          # Fix error: unused option: RT_GROUP_SCHED.
+          RT_GROUP_SCHED = prev.lib.mkForce (option no); # Removed by sched-disable-rt-group-sched-on-rt.patch.
+          VIRTUALIZATION = no;
         };
         features.efiBootStub = false;
         kernelPatches =
@@ -114,7 +135,7 @@ in
 
 } // {
   # rpi kernels and firmware are available at
-  # `pkgs.rpi-kernels.<VERSION>.<BOARD>'. 
+  # `pkgs.rpi-kernels.<VERSION>.<BOARD>'.
   #
   # For example: `pkgs.rpi-kernels.v6_6_54.bcm2712'
   rpi-kernels = rpi-kernels (
